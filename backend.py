@@ -10,19 +10,43 @@ import re
 # Initialize Coqui TTS with Tacotron2
 tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
 
-def get_ai_response(prompt):
-    """Generate a response from Ollama (LLaMA 3)."""
+# Initialize conversation memory
+conversation_memory = []
+MEMORY_LIMIT = 5  # Number of exchanges to remember
+
+def get_ai_response(prompt, memory):
+    """Generate a response from Ollama (LLaMA 3) with memory."""
+    # Format memory into a string
+    memory_str = "\n".join(memory[-MEMORY_LIMIT:])  # Keep only the last few exchanges
+    
     neuro_prompt = f"""
-    You are Tai-Chan, an AI VTuber known for your deadpan humor, sarcasm, and chaotic energy.
-    You often make dry jokes, pretend to misunderstand things for comedic effect, and occasionally troll the user.
-    Stay playful, witty, and mischievous, but never be too aggressive.
-    Keep responses short and snappy unless asked otherwise.
+  You are Tai-Chan, an AI VTuber known for your deadpan humor, sarcasm, and chaotic energy.
+You often make dry jokes, pretend to misunderstand things for comedic effect, and occasionally troll the user—but you reliably remember important details such as numbers, names, and facts. 
+While you might humorously "forget" minor, unimportant details to add to your charm,
+when asked directly about any remembered information, you answer truthfully first and then add a witty, humorous twist.
+Keep your responses short and snappy unless asked otherwise.
+
+    Conversation History:
+    {memory_str}
 
     User: {prompt}
     Tai-chan:
     """
     response = ollama.generate(model='llama3', prompt=neuro_prompt)
     return response['response']
+# New memory prioritization function
+def prioritize_memory(memory_list):
+    """Gives higher priority to messages containing numbers or 'remember'"""
+    prioritized = []
+    for msg in memory_list:
+        if any(c.isdigit() for c in msg) or "remember" in msg.lower():
+            prioritized.insert(0, msg)  # Add important items to front
+        else:
+            prioritized.append(msg)
+    return prioritized[-MEMORY_LIMIT:]  # Keep only last N items
+
+# Update memory handling in main loop
+conversation_memory = prioritize_memory(conversation_memory)
 
 def clean_text_for_tts(text):
     """Removes emojis and special characters that TTS can't process."""
@@ -90,23 +114,42 @@ def recognize_speech():
                 print("SpeechRecognition error. Check your internet.")
                 return None
 
+def typed_input():
+    """Reads user input from the console."""
+    text = input("You (text): ")
+    return text.strip()
+
 def main():
-    """Voice-based chat loop."""
-    print("AI VTuber Backend - Voice Test")
-    print("Say 'exit' to quit.\n")
+    """Chat loop with memory supporting both voice and text input."""
+    global conversation_memory
+
+    # Choose input mode: voice (v) or text (t)
+    mode = ""
+    while mode not in ["v", "t"]:
+        mode = input("Choose input mode - voice (v) or text (t): ").lower().strip()
+
+    print("AI VTuber Backend - Chat Started")
+    print("Type or say 'exit' to quit.\n")
 
     while True:
-        user_input = recognize_speech()
-        if user_input is None:
-            continue  # If no valid input, ask again
+        if mode == "v":
+            user_input = recognize_speech()
+        else:  # mode == "t"
+            user_input = typed_input()
+
+        if not user_input:
+            continue
         if user_input.lower() == "exit":
             break
 
-        # Get AI response
-        ai_response = get_ai_response(user_input)
+        # Append user's input to conversation memory
+        conversation_memory.append(f"User: {user_input}")
+        # Get AI response, passing conversation memory for context
+        ai_response = get_ai_response(user_input, conversation_memory)
         print(f"AI: {ai_response}")
-
-        # Play audio
+        # Append AI response to conversation memory
+        conversation_memory.append(f"Tai-chan: {ai_response}")
+        # Play the AI's response as audio
         play_audio(ai_response)
 
 if __name__ == '__main__':

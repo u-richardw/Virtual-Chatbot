@@ -1,0 +1,6 @@
+ollama
+sounddevice
+numpy
+SpeechRecognition
+TTS
+webrtcvad
