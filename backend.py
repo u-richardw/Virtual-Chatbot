@@ -6,108 +6,118 @@ from TTS.api import TTS
 import time
 import webrtcvad
 import re
+import json
+import os
 
-# Initialize Coqui TTS with Tacotron2
+# Initialize Coqui TTS
 tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
 
-# Initialize conversation memory
-conversation_memory = []
-MEMORY_LIMIT = 5  # Number of exchanges to remember
+# Initialize WebRTC VAD
+vad = webrtcvad.Vad(2)
+
+# Memory configuration
+MEMORY_LIMIT = 5
+MEMORY_FILE = "tai_chan_memory.json"
+
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_memory(memory):
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(memory, f)
+
+conversation_memory = load_memory()
 
 def get_ai_response(prompt, memory):
-    """Generate a response from Ollama (LLaMA 3) with memory."""
-    # Format memory into a string
-    memory_str = "\n".join(memory[-MEMORY_LIMIT:])  # Keep only the last few exchanges
+    memory_str = "\n".join(memory[-MEMORY_LIMIT:])
     
     neuro_prompt = f"""
-  You are Tai-Chan, an AI VTuber known for your deadpan humor, sarcasm, and chaotic energy.
-You often make dry jokes, pretend to misunderstand things for comedic effect, and occasionally troll the user—but you reliably remember important details such as numbers, names, and facts. 
-While you might humorously "forget" minor, unimportant details to add to your charm,
-when asked directly about any remembered information, you answer truthfully first and then add a witty, humorous twist.
-Keep your responses short and snappy unless asked otherwise.
+    You are Tai-Chan, an AI VTuber known for deadpan humor and sarcasm.
+    - Never use asterisks (*) or stage directions
+    - Avoid dramatic pauses, sighs, or whispers
+    - Deliver information directly first, then add humor
+    - Keep responses concise (1-2 sentences max)
+    - Always remember numbers/names accurately
 
     Conversation History:
     {memory_str}
 
     User: {prompt}
-    Tai-chan:
-    """
+    Tai-chan:"""
+    
     response = ollama.generate(model='llama3', prompt=neuro_prompt)
-    return response['response']
-# New memory prioritization function
+    return clean_ai_response(response['response'])
+
+def clean_ai_response(text):
+    text = re.sub(r'[*()]', '', text)
+    text = re.sub(r'\.{2,}', '.', text)
+    text = re.sub(r'\b(?:sigh|whisper|dramatic pause)\b', '', text, flags=re.IGNORECASE)
+    return text.strip()
+
 def prioritize_memory(memory_list):
-    """Gives higher priority to messages containing numbers or 'remember'"""
     prioritized = []
     for msg in memory_list:
         if any(c.isdigit() for c in msg) or "remember" in msg.lower():
-            prioritized.insert(0, msg)  # Add important items to front
+            prioritized.insert(0, msg)
         else:
             prioritized.append(msg)
-    return prioritized[-MEMORY_LIMIT:]  # Keep only last N items
-
-# Update memory handling in main loop
-conversation_memory = prioritize_memory(conversation_memory)
+    return prioritized[-MEMORY_LIMIT:]
 
 def clean_text_for_tts(text):
-    """Removes emojis and special characters that TTS can't process."""
-    return re.sub(r'[^\w\s,.!?\'"-]', '', text)  # Keeps letters, numbers, punctuation
+    text = re.sub(r'[^\w\s,.!?\'-]', '', text)
+    return ' '.join(text.split())
 
 def ensure_min_length(text, min_chars=10):
-    """Ensures the text is long enough for TTS by adding filler if needed."""
     if len(text) < min_chars:
-        text += " ..."  # Add filler so TTS doesn't fail
+        text += " ..."
     return text
 
 def play_audio(text):
-    """Convert text to speech using Coqui TTS and play it."""
     try:
-        text = clean_text_for_tts(text)  # Remove emojis
-        text = ensure_min_length(text)   # Ensure text is long enough
-        audio = tts.tts(text=text)
-
+        text = clean_text_for_tts(text)
+        text = ensure_min_length(text)
+        text = re.sub(r'(\d+)', r'\1 ', text)
+        
+        # Add model-specific parameters here
+        audio = tts.tts(
+            text=text,
+            decoder_iterations=500,  # Add here
+            noise_scale=0.5,         # Add here
+            length_scale=0.9         # Add here
+        )
+        
         audio_np = np.array(audio, dtype=np.float32)
-        audio_np /= np.max(np.abs(audio_np))  # Normalize to prevent clipping
+        audio_np /= np.max(np.abs(audio_np))
         sd.play(audio_np, samplerate=22050)
         sd.wait()
     except Exception as e:
-        print(f"Error in TTS: {e}")
-
-# Initialize WebRTC VAD
-vad = webrtcvad.Vad(2)  # Sensitivity (0 = least sensitive, 3 = most sensitive)
+        print(f"TTS Error: {str(e)[:100]}")
 
 def is_speech(audio_data, sample_rate=16000, frame_duration=30):
-    """Detects speech using WebRTC VAD before sending to SpeechRecognition."""
-    frame_size = int(sample_rate * frame_duration / 1000)  # Convert ms to samples
+    frame_size = int(sample_rate * frame_duration / 1000)
     audio_np = np.frombuffer(audio_data, dtype=np.int16)
-
     for i in range(0, len(audio_np), frame_size):
         frame = audio_np[i:i+frame_size].tobytes()
         if vad.is_speech(frame, sample_rate):
-            return True  # Speech detected
-    return False  # No speech detected
+            return True
+    return False
 
 def recognize_speech():
-    """Always listens and only activates when speech is detected."""
     recognizer = sr.Recognizer()
-
     with sr.Microphone(sample_rate=16000) as source:
         print("Listening... Speak anytime.")
-        recognizer.adjust_for_ambient_noise(source, duration=1)  # Auto-adjust for noise
-
-        while True:  # Infinite listening loop
+        recognizer.adjust_for_ambient_noise(source, duration=1)
+        while True:
             try:
-                # Step 1: Passively listen for speech
-                audio = recognizer.listen(source, timeout=None, phrase_time_limit=5)  # Wait indefinitely
-                
-                # Step 2: Check if it's real speech using VAD
+                audio = recognizer.listen(source, timeout=None, phrase_time_limit=5)
                 if not is_speech(audio.frame_data, sample_rate=16000):
-                    continue  # Ignore silence & background noise
-                
-                # Step 3: Recognize the speech
+                    continue
                 text = recognizer.recognize_google(audio).lower()
                 print(f"You said: {text}")
-                return text  # Return valid speech when detected
-
+                return text
             except sr.UnknownValueError:
                 print("Couldn't understand speech. Try again.")
             except sr.RequestError:
@@ -115,42 +125,34 @@ def recognize_speech():
                 return None
 
 def typed_input():
-    """Reads user input from the console."""
     text = input("You (text): ")
     return text.strip()
 
 def main():
-    """Chat loop with memory supporting both voice and text input."""
     global conversation_memory
-
-    # Choose input mode: voice (v) or text (t)
     mode = ""
     while mode not in ["v", "t"]:
         mode = input("Choose input mode - voice (v) or text (t): ").lower().strip()
-
     print("AI VTuber Backend - Chat Started")
     print("Type or say 'exit' to quit.\n")
-
-    while True:
-        if mode == "v":
-            user_input = recognize_speech()
-        else:  # mode == "t"
-            user_input = typed_input()
-
-        if not user_input:
-            continue
-        if user_input.lower() == "exit":
-            break
-
-        # Append user's input to conversation memory
-        conversation_memory.append(f"User: {user_input}")
-        # Get AI response, passing conversation memory for context
-        ai_response = get_ai_response(user_input, conversation_memory)
-        print(f"AI: {ai_response}")
-        # Append AI response to conversation memory
-        conversation_memory.append(f"Tai-chan: {ai_response}")
-        # Play the AI's response as audio
-        play_audio(ai_response)
+    try:
+        while True:
+            if mode == "v":
+                user_input = recognize_speech()
+            else:
+                user_input = typed_input()
+            if not user_input:
+                continue
+            if user_input.lower() == "exit":
+                break
+            conversation_memory.append(f"User: {user_input}")
+            ai_response = get_ai_response(user_input, conversation_memory)
+            print(f"AI: {ai_response}")
+            conversation_memory.append(f"Tai-chan: {ai_response}")
+            play_audio(ai_response)
+    finally:
+        save_memory(conversation_memory)
+        print("\nMemory saved for next session!")
 
 if __name__ == '__main__':
     main()
