@@ -4,3 +4,4 @@ numpy
 SpeechRecognition
 TTS
 webrtcvad
+pyaudio
