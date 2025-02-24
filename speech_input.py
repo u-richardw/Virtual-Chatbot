@@ -5,13 +5,22 @@ from config import VAD_AGGRESSIVENESS, SAMPLE_RATE
 
 vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
 
-def is_speech(audio_data, sample_rate=SAMPLE_RATE, frame_duration=30):
+def is_speech(audio_data, sample_rate=16000, frame_duration=30):
     frame_size = int(sample_rate * frame_duration / 1000)
+    
+    # Convert audio data to 16-bit PCM format
     audio_np = np.frombuffer(audio_data, dtype=np.int16)
+    
+    # Process in chunks that match WebRTC VAD requirements
     for i in range(0, len(audio_np), frame_size):
-        frame = audio_np[i:i+frame_size].tobytes()
-        if vad.is_speech(frame, sample_rate):
-            return True
+        frame = audio_np[i:i+frame_size]
+        if len(frame) < frame_size:
+            continue  # Skip incomplete frames
+        try:
+            if vad.is_speech(frame.tobytes(), sample_rate):
+                return True
+        except:
+            return False
     return False
 
 def recognize_speech():

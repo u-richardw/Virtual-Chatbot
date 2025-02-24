@@ -24,6 +24,8 @@ def play_audio(text):
         audio = tts.tts(text=text)
         audio_np = np.array(audio, dtype=np.float32)
         audio_np /= np.max(np.abs(audio_np))
+        
+        # Play at TTS sample rate (22050 Hz)
         sd.play(audio_np, samplerate=SAMPLE_RATE)
         sd.wait()
     except Exception as e:
