@@ -1,7 +1,7 @@
 from memory import load_memory, save_memory
 from ai_handler import get_ai_response
 from speech_input import recognize_speech, typed_input
-from audio import play_audio
+from watson_tts import play_audio
 
 def main():
     conversation_memory = load_memory()

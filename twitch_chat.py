@@ -1,58 +1,32 @@
-import os
-import twitchio
+import asyncio
+import random
+import ollama
 from twitchio.ext import commands
-from memory import load_memory, save_memory
-from ai_handler import get_ai_response
 
-
-TWITCH_TOKEN = "oauth:1ashkq252nievdfihwpy491chkqmj2"
-
-TWITCH_CHANNEL = "schrodingerlee"
-BOT_NICKNAME = "tai_chan_bot"
-
-class TaiChanBot(commands.Bot):
+class Bot(commands.Bot):
     def __init__(self):
-        super().__init__(
-            token=TWITCH_TOKEN,
-            prefix="!",
-            nick=BOT_NICKNAME,
-            initial_channels=[TWITCH_CHANNEL]
-        )
-        self.memory = load_memory()  # Initialize memory
+        super().__init__(token='1ashkq252nievdfihwpy491chkqmj2', prefix='!', initial_channels=['YOUR_TWITCH_CHANNEL'])
 
     async def event_ready(self):
-        print(f"{BOT_NICKNAME} is now connected to Twitch chat!")
+        print(f'Logged in as | {self.nick}')
+        print(f'Connected to channel | {self.initial_channels[0]}')
 
     async def event_message(self, message):
-        if message.echo:
+        if message.author.name.lower() == self.nick.lower():
             return  # Ignore bot's own messages
-        
-        chat_text = message.content.strip()
-        username = message.author.name
-        print(f"[Twitch] {username}: {chat_text}")
 
-        # Ignore spammy messages or short reactions
-        if len(chat_text) < 5 or chat_text.startswith("!") or chat_text.lower() in ["lol", "lmao", "xd"]:
-            return
+        chat_message = f"{message.author.name}: {message.content}"
+        print(chat_message)
 
-        # Prioritize meaningful messages
-        if "tai-chan" in chat_text.lower() or any(c.isdigit() for c in chat_text):
-            self.memory.insert(0, f"{username}: {chat_text}")  # Prioritize
-        else:
-            self.memory.append(f"{username}: {chat_text}")
+        # Store chat messages for learning
+        with open("chat_log.txt", "a", encoding="utf-8") as file:
+            file.write(chat_message + "\n")
 
-        # Keep memory size manageable
-        if len(self.memory) > 50:
-            self.memory.pop()
+        # Generate AI response using fine-tuned Ollama model
+        response = ollama.chat(model="my-chatbot", messages=[{"role": "user", "content": message.content}])
+        reply = response['message']['content']
 
-        save_memory(self.memory)  # Save memory
+        await message.channel.send(reply)
 
-        # Respond if Tai-Chan is mentioned
-        if "tai-chan" in chat_text.lower():
-            response = get_ai_response(chat_text, self.memory)
-            await message.channel.send(f"@{username} {response}")  # Mention user for better engagement
-
-# Run the bot
-if __name__ == "__main__":
-    bot = TaiChanBot()
-    bot.run()
+bot = Bot()
+bot.run()
