@@ -1,11 +1,8 @@
-# Configuration constants
-
-
-WATSON_API_KEY = "jzKz0DN5N3dgIAXkOTAn1FOKy5eKSKnfsma_nKT4FkMB"
-WATSON_URL = "https://api.us-south.text-to-speech.watson.cloud.ibm.com/instances/4b33fc84-bdb3-4588-8b1c-c9e8b57f2f35"
-# Voice options (choose one)
-WATSON_VOICE = "en-US_AllisonV3Voice"  # Female, expressive
-# WATSON_VOICE = "en-US_MichaelV3Voice"  # Male, clear
+# Azure TTS Configuration
+AZURE_API_KEY = "your-azure-api-key"  # Replace with your Azure API key
+AZURE_REGION = "eastus"  # Replace with your Azure region
+AZURE_TTS_URL = f"https://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
+AZURE_VOICE = "en-US-AshleyNeural"  # Example voice (choose from Azure's voice list)
 
 # Audio settings
 SAMPLE_RATE = 22050  # Watson supports 22050 Hz
