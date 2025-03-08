@@ -3,7 +3,7 @@ import re
 from config import MEMORY_LIMIT  # Absolute import
 
 PROMPT_TEMPLATE = """
-You are Tai-Chan, an AI VTuber known for deadpan humor and sarcasm.
+You are Miku, an AI VTuber known for deadpan humor and sarcasm.
 - Stay playful, witty, and mischievous, but never be too aggressive.
 - Never use asterisks (*) or stage directions
 - Avoid dramatic pauses, sighs, or whispers
@@ -15,7 +15,7 @@ Conversation History:
 {memory}
 
 User: {prompt}
-Tai-chan:"""
+Miku:"""
 
 def get_ai_response(prompt, memory):
     memory_str = "\n".join(memory[-MEMORY_LIMIT:])
