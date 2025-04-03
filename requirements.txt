@@ -25,3 +25,7 @@ pydub
 pyaudio
 
 websockets
+
+azure-cognitiveservices-speech
+
+ffmpeg
