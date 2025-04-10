@@ -40,6 +40,7 @@ Windows: .\venv\Scripts\activate
 Install requirements:
 
 pip install -r requirements.txt 3. Configure Ollama Close Ollama if it's already running
+Create a Microsoft Azure speech service token and replace it in config.py
 
 Run Llama3 model:
 
