@@ -1,5 +1,5 @@
 # Azure TTS Configuration
-AZURE_API_KEY = "A3B7CxnCrdzixMNPhiC32zBj1feidWfwjyKN22Js3JUIrAXUFm0dJQQJ99BCACYeBjFXJ3w3AAAYACOGRRXw"  # Replace with your Azure API key
+AZURE_API_KEY = "your_api_key_here"  # Replace with your Azure API key
 AZURE_REGION = "eastus"  # Replace with your Azure region
 AZURE_TTS_URL = f"https://{AZURE_REGION}.tts.speech.microsoft.com/cognitiveservices/v1"
 AZURE_VOICE = "en-US-AshleyNeural"  # Example voice (choose from Azure's voice list)
